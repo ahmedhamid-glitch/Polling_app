@@ -1,82 +1,4 @@
-// import { db } from "./db";
-
-// export interface User {
-//   id: number;
-//   email: string;
-//   password: string;
-// }
-
-// async function ensureUsersTableExists() {
-//   const createTableQuery = `
-//     CREATE TABLE IF NOT EXISTS users (
-//       id INT AUTO_INCREMENT PRIMARY KEY,
-//       email VARCHAR(255) NOT NULL UNIQUE,
-//       password VARCHAR(255) NOT NULL
-//     )
-//   `;
-//   await db.query(createTableQuery);
-// }
-
-// export async function createUser(
-//   email: string,
-//   password: string
-// ): Promise<User | null> {
-//   await ensureUsersTableExists();
-//   const [result] = await db.query(
-//     "INSERT INTO users (email, password) VALUES (?, ?)",
-//     [email, password]
-//   );
-
-//   const insertId = (result as any).insertId;
-//   if (!insertId) return null;
-
-//   return { id: insertId, email, password };
-// }
-
-// export async function getUserById(id: number): Promise<User | null> {
-//   const [rows] = await db.query("SELECT * FROM users WHERE id = ?", [id]);
-//   const users = rows as User[];
-//   if (users.length === 0) return null;
-//   return users[0];
-// }
-
-// export async function updateUser(
-//   id: number,
-//   email?: string,
-//   password?: string
-// ): Promise<boolean> {
-//   const fields = [];
-//   const values = [];
-
-//   if (email) {
-//     fields.push("email = ?");
-//     values.push(email);
-//   }
-
-//   if (password) {
-//     fields.push("password = ?");
-//     values.push(password);
-//   }
-
-//   if (fields.length === 0) return false;
-
-//   values.push(id);
-
-//   const sql = `UPDATE users SET ${fields.join(", ")} WHERE id = ?`;
-//   const [result] = await db.query(sql, values);
-
-//   return (result as any).affectedRows > 0;
-// }
-
-// export async function deleteUser(id: number): Promise<boolean> {
-//   const [result] = await db.query("DELETE FROM users WHERE id = ?", [id]);
-//   return (result as any).affectedRows > 0;
-// }
-
-// export async function getAllUsers(): Promise<User[]> {
-//   const [rows] = await db.query("SELECT * FROM users");
-//   return rows as User[];
-// }
+import bcrypt from "bcrypt";
 
 import { db } from "./db";
 
@@ -84,6 +6,8 @@ export interface User {
   id: number;
   email: string;
   password: string;
+  userName: string;
+  recoverEmail: string;
 }
 
 async function ensureUsersTableExists() {
@@ -91,26 +15,31 @@ async function ensureUsersTableExists() {
     CREATE TABLE IF NOT EXISTS users (
       id INT AUTO_INCREMENT PRIMARY KEY,
       email VARCHAR(255) NOT NULL UNIQUE,
-      password VARCHAR(255) NOT NULL
+      password VARCHAR(255) NOT NULL,
+      userName VARCHAR(50) NOT NULL,
+      recoverEmail VARCHAR(255) NOT NULL
     )
   `;
   await db.query(createTableQuery);
 }
 
-export async function createUser(
+export async function signUp(
+  userName: string,
+  recoverEmail: string,
   email: string,
   password: string
 ): Promise<User | null> {
   await ensureUsersTableExists();
+  const hashedPassword = await bcrypt.hash(password, 10);
   const [result] = await db.query(
-    "INSERT INTO users (email, password) VALUES (?, ?)",
-    [email, password]
+    "INSERT INTO users (email, password, userName, recoverEmail) VALUES (?, ?, ?, ?)",
+    [email, hashedPassword, userName, recoverEmail]
   );
 
   const insertId = (result as any).insertId;
   if (!insertId) return null;
 
-  return { id: insertId, email, password };
+  return { id: insertId, email, password, userName, recoverEmail };
 }
 
 export async function getUserById(id: number): Promise<User | null> {
@@ -120,32 +49,20 @@ export async function getUserById(id: number): Promise<User | null> {
   return users[0];
 }
 
-export async function updateUser(
-  id: number,
-  email?: string,
-  password?: string
-): Promise<boolean> {
-  const fields = [];
-  const values = [];
+export async function login(email: string, password: string) {
+  const [rows] = await db.query(
+    "SELECT id, email, password, userName, recoverEmail FROM users WHERE email = ?",
+    [email]
+  );
 
-  if (email) {
-    fields.push("email = ?");
-    values.push(email);
-  }
+  const user = (rows as any[])[0];
+  if (!user) return null;
 
-  if (password) {
-    fields.push("password = ?");
-    values.push(password);
-  }
+  const passwordMatch = await bcrypt.compare(password, user.password);
+  if (!passwordMatch) return null;
 
-  if (fields.length === 0) return false;
-
-  values.push(id);
-
-  const sql = `UPDATE users SET ${fields.join(", ")} WHERE id = ?`;
-  const [result] = await db.query(sql, values);
-
-  return (result as any).affectedRows > 0;
+  const { password: _, ...safeUser } = user; // Remove password before returning
+  return safeUser;
 }
 
 export async function deleteUser(id: number): Promise<boolean> {
@@ -157,5 +74,3 @@ export async function getAllUsers(): Promise<User[]> {
   const [rows] = await db.query("SELECT * FROM users");
   return rows as User[];
 }
-
-

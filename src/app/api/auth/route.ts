@@ -1,10 +1,12 @@
 // import { NextResponse } from "next/server";
-// import { createUser, updateUser } from "@/lib/users";
+// import { signUp, login } from "@/lib/users";
+
+// // jwt
 
 // export async function POST(request: Request) {
 //   try {
 //     const body = await request.json();
-//     const { id, email, password } = body;
+//     const { userName, recoverEmail, email, password } = body;
 
 //     if (!email || !password) {
 //       return NextResponse.json(
@@ -13,27 +15,31 @@
 //       );
 //     }
 
-//     if (id) {
+//     if (!userName || !recoverEmail) {
 //       // Update existing user
-//       const updated = await updateUser(id, email, password);
+//       const updated = await login(email, password);
 //       if (!updated) {
 //         return NextResponse.json(
 //           { error: "User not found or nothing to update" },
 //           { status: 404 }
 //         );
 //       }
-//       return NextResponse.json({ message: "User updated" }, { status: 200 });
+//       return NextResponse.json(
+//         { message: "User updated", user: updated },
+//         { status: 200 }
+//       );
 //     } else {
-//       // Create new user
-//       const user = await createUser(email, password);
+//       const user = await signUp(userName, recoverEmail, email, password);
 //       if (!user) {
 //         return NextResponse.json(
 //           { error: "Failed to create user" },
 //           { status: 500 }
 //         );
 //       }
+//       const { password: _, ...safeUser } = user;
+
 //       return NextResponse.json(
-//         { message: "User created", user },
+//         { message: "User created", user: safeUser },
 //         { status: 201 }
 //       );
 //     }
@@ -46,55 +52,76 @@
 //   }
 // }
 
-// // export async function PUT(request: Request) {
-// //   try {
-// //     const body = await request.json();
-// //     const { id, email, password } = body;
+import { NextResponse } from "next/server";
+import { signUp, login } from "@/lib/users";
+import jwt from "jsonwebtoken";
 
-// //     if (!id) {
-// //       return NextResponse.json(
-// //         { error: "User ID is required" },
-// //         { status: 400 }
-// //       );
-// //     }
+const JWT_SECRET = process.env.JWT_SECRET!;
 
-// //     const fields: string[] = [];
-// //     const values: any[] = [];
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const { action, userName, recoverEmail, email, password } = body;
 
-// //     if (email) {
-// //       fields.push("email = ?");
-// //       values.push(email);
-// //     }
+    if (!email || !password) {
+      return NextResponse.json(
+        { error: "Email and password are required" },
+        { status: 400 }
+      );
+    }
 
-// //     if (password) {
-// //       fields.push("password = ?");
-// //       values.push(password);
-// //     }
+    let user;
 
-// //     if (fields.length === 0) {
-// //       return NextResponse.json(
-// //         { error: "No fields to update" },
-// //         { status: 400 }
-// //       );
-// //     }
+    if (action === "signup") {
+      if (!userName || !recoverEmail) {
+        return NextResponse.json(
+          { error: "userName and recoverEmail are required for signup" },
+          { status: 400 }
+        );
+      }
 
-// //     values.push(id);
+      user = await signUp(userName, recoverEmail, email, password);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Failed to create user" },
+          { status: 500 }
+        );
+      }
+    } else if (action === "login") {
+      user = await login(email, password);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Invalid credentials" },
+          { status: 401 }
+        );
+      }
+    } else {
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+    }
 
-// //     const sql = `UPDATE users SET ${fields.join(", ")} WHERE id = ?`;
-// //     const [result] = (await db.query(sql, values)) as [ResultSetHeader, any];
+    // Exclude password and sensitive fields
+    const { password: _, ...safeUser } = user;
 
-// //     return NextResponse.json({
-// //       message: "User updated",
-// //       affectedRows: result.affectedRows,
-// //     });
-// //   } catch (error) {
-// //     console.error(error);
-// //     return NextResponse.json({ error: "Database error" }, { status: 500 });
-// //   }
-// // }
+    // Generate JWT Token
+    const token = jwt.sign(
+      { id: user._id, email: user.email, userName: user.userName },
+      JWT_SECRET,
+      { expiresIn: "7d" }
+    );
 
-
-
-
-
-
+    return NextResponse.json(
+      {
+        message: action === "signup" ? "User created" : "User signed in",
+        user: safeUser,
+        token,
+      },
+      { status: action === "signup" ? 201 : 200 }
+    );
+  } catch (error: any) {
+    console.error("Auth error:", error);
+    return NextResponse.json(
+      { error: error.message || "Server error" },
+      { status: 500 }
+    );
+  }
+}

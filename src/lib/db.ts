@@ -1,27 +1,27 @@
-// lib/init-db.ts
 import mysql from "mysql2/promise";
+import dotenv from "dotenv";
 
-const databaseName = "polling_app";
+dotenv.config(); // load .env variables
 
-export async function initDB() {
-  const connection = await mysql.createConnection({
-    host: "localhost",
-    user: "root",
-    password: "Freedom22*",
+const createAndUpdateDB = async () => {
+  const db = await mysql.createConnection({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
   });
 
-  await connection.query(`CREATE DATABASE IF NOT EXISTS \`${databaseName}\``);
-  await connection.end();
+  await db.query(`CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME}\``);
+  await db.end();
 
   return mysql.createPool({
-    host: "localhost",
-    user: "root",
-    password: "Freedom22*",
-    database: databaseName,
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
   });
-}
+};
 
-export const db = await initDB();
+export const db = await createAndUpdateDB();
