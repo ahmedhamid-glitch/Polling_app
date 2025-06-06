@@ -1,5 +1,7 @@
 // app/api/votes/stream/route.ts
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const pollId = url.searchParams.get("pollId");

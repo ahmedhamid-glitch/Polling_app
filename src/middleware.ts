@@ -1,13 +1,22 @@
 import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
+import { getDb } from "./lib/db";
 
 // This function can be marked `async` if using `await` inside
-export function middleware(request: NextRequest) {
-  console.log("middleware");
-  return NextResponse.redirect(new URL("/", request.url));
+export async function middleware(request: NextRequest) {
+  // Check database connection
+  const db = await getDb();
+  if (!db) {
+    return NextResponse.json(
+      { error: "Database connection failed" },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.next();
 }
 
 // See "Matching Paths" below to learn more
 export const config = {
-  matcher: ["/login2/:path*", "/signup2/:path*"],
+  matcher: "/api/:path*",
 };

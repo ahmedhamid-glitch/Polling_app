@@ -1,27 +1,31 @@
 import mysql from "mysql2/promise";
 import dotenv from "dotenv";
 
-dotenv.config(); // load .env variables
+dotenv.config();
 
-const createAndUpdateDB = async () => {
-  const db = await mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-  });
+let db: mysql.Connection | null = null;
 
-  await db.query(`CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME}\``);
-  await db.end();
+export async function getDb() {
+  if (db) return db;
 
-  return mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-  });
-};
+  try {
+    db = await mysql.createConnection({
+      host: process.env.MYSQL_HOST,
+      user: process.env.MYSQL_USER,
+      password: process.env.MYSQL_PASSWORD,
+      database: process.env.MYSQL_DATABASE,
+    });
 
-export const db = await createAndUpdateDB();
+    return db;
+  } catch (error) {
+    console.error("Failed to connect to database:", error);
+    return null;
+  }
+}
+
+export async function closeDb() {
+  if (db) {
+    await db.end();
+    db = null;
+  }
+}

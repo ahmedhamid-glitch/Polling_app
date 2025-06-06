@@ -147,9 +147,12 @@
 //   return { pollIdData: result };
 // }
 
-import { db } from "./db";
+import { getDb } from "./db";
 
 async function ensureLivePollTableExists() {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection failed");
+
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS live_poll (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -174,6 +177,9 @@ export async function createLivePollQes({
   options: string[];
   userEmail: string;
 }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection failed");
+
   await ensureLivePollTableExists();
 
   const optionsStr = JSON.stringify(options);
@@ -279,6 +285,9 @@ export async function createLivePollQes({
 // }
 
 export async function getAllPolls(email: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection failed");
+
   await ensureLivePollTableExists();
   const [result] = await db.query(
     "SELECT * FROM live_poll WHERE userEmail = ?",

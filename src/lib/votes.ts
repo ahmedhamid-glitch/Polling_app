@@ -1,6 +1,9 @@
-import { db } from "./db";
+import { getDb } from "./db";
 
 async function ensureVoteTableExists() {
+  const db = await getDb();
+  if (!db) return;
+
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS votes (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -28,6 +31,9 @@ export async function createVotes({
   vote: string;
   pollId: string;
 }) {
+  const db = await getDb();
+  if (!db) return null;
+
   await ensureVoteTableExists();
 
   const [votes] = await db.query(
@@ -39,6 +45,7 @@ export async function createVotes({
 
   return { id: insertId, userEmail, userName, vote, pollId };
 }
+
 export async function updateVotes({
   userEmail,
   vote,
@@ -48,6 +55,9 @@ export async function updateVotes({
   vote: string;
   pollId: string;
 }) {
+  const db = await getDb();
+  if (!db) return null;
+
   await ensureVoteTableExists();
 
   const [result] = await db.query(
@@ -65,6 +75,9 @@ export async function updateVotes({
 }
 
 export async function getVotes({ pollId }: { pollId: string }) {
+  const db = await getDb();
+  if (!db) return null;
+
   const [pollRows] = await db.query(`SELECT * FROM live_poll WHERE id = ?`, [
     pollId,
   ]);
@@ -93,6 +106,9 @@ export async function deleteVotes({
   userName: string;
   pollId: string;
 }) {
+  const db = await getDb();
+  if (!db) return null;
+
   await ensureVoteTableExists();
 
   const [result] = await db.query(

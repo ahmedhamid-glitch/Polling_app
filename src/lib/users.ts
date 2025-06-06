@@ -1,6 +1,5 @@
 import bcrypt from "bcrypt";
-
-import { db } from "./db";
+import { getDb } from "./db";
 
 export interface User {
   id: number;
@@ -11,6 +10,9 @@ export interface User {
 }
 
 async function ensureUsersTableExists() {
+  const db = await getDb();
+  if (!db) return;
+
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS users (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -29,6 +31,9 @@ export async function signUp(
   email: string,
   password: string
 ): Promise<User | null> {
+  const db = await getDb();
+  if (!db) return null;
+
   await ensureUsersTableExists();
   const hashedPassword = await bcrypt.hash(password, 10);
   const [result] = await db.query(
@@ -43,6 +48,9 @@ export async function signUp(
 }
 
 export async function getUserById(id: number): Promise<User | null> {
+  const db = await getDb();
+  if (!db) return null;
+
   const [rows] = await db.query("SELECT * FROM users WHERE id = ?", [id]);
   const users = rows as User[];
   if (users.length === 0) return null;
@@ -50,6 +58,9 @@ export async function getUserById(id: number): Promise<User | null> {
 }
 
 export async function login(email: string, password: string) {
+  const db = await getDb();
+  if (!db) return null;
+
   const [rows] = await db.query(
     "SELECT id, email, password, userName, recoverEmail FROM users WHERE email = ?",
     [email]
@@ -66,11 +77,17 @@ export async function login(email: string, password: string) {
 }
 
 export async function deleteUser(id: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
   const [result] = await db.query("DELETE FROM users WHERE id = ?", [id]);
   return (result as any).affectedRows > 0;
 }
 
 export async function getAllUsers(): Promise<User[]> {
+  const db = await getDb();
+  if (!db) return [];
+
   const [rows] = await db.query("SELECT * FROM users");
   return rows as User[];
 }
