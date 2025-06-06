@@ -7,11 +7,10 @@ import React, {
   Dispatch,
   SetStateAction,
 } from "react";
-import { jwtDecode } from "jwt-decode";
 
-// ---------------------------
-// Type Definitions
-// ---------------------------
+import { jwtDecode } from "jwt-decode"; // <-- fixed import here
+
+// Types
 interface User {
   email: string;
   [key: string]: any;
@@ -24,22 +23,27 @@ interface AuthState {
   loadingDomains: boolean;
 }
 
+interface AuthAllPolls {
+  id: number;
+  options: string[];
+  title: string;
+  userEmail: string;
+}
+
 interface AuthContextType extends AuthState {
   login: (userData: { token: string } & User) => void;
   logout: () => void;
   updateUser: (user: User) => void;
-  setState: Dispatch<SetStateAction<AuthState>>;
+  setAllPolls: Dispatch<SetStateAction<AuthAllPolls[]>>;
+  allPolls: AuthAllPolls[];
 }
 
-// ---------------------------
-// Create Context
-// ---------------------------
+// Context
 export const AuthContext = createContext<AuthContextType | null>(null);
 
-// ---------------------------
-// Provider Component
-// ---------------------------
+// Provider
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [allPolls, setAllPolls] = useState<AuthAllPolls[]>([]);
   const [state, setState] = useState<AuthState>({
     isAuthenticated: false,
     user: null,
@@ -48,8 +52,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const login = ({ token, ...user }: { token: string } & User) => {
+    console.log("users:", user.user, token);
     localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(user));
+    localStorage.setItem("user", JSON.stringify(user.user));
 
     setState((prev) => ({
       ...prev,
@@ -83,7 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     if (token && user) {
       try {
-        const decoded: any = jwtDecode(token);
+        const decoded: any = jwtDecode(token); // <-- use jwtDecode directly here
         const isExpired = decoded.exp * 1000 < Date.now();
 
         if (isExpired) {
@@ -115,12 +120,63 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     checkToken();
   }, []);
 
+  useEffect(() => {
+    const fetchAllPoll = async () => {
+      const storedUser = localStorage.getItem("user");
+      if (!storedUser) return;
+
+      const user = JSON.parse(storedUser);
+
+      try {
+        const res = await fetch(`/api/live_poll?email=${user.email}`);
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          console.error("Poll get failed:", errorData.message);
+          return;
+        }
+
+        const data = await res.json();
+
+        if (!data.data?.allPolls?.length) {
+          console.log("Poll table not ready or no polls found.");
+          return;
+        }
+
+        const pollsWithParsedOptions = data.data.allPolls.map((poll: any) => ({
+          ...poll,
+          options: safeParseJSON(poll.options),
+          // votes: safeParseJSON(poll.votes),
+        }));
+
+        function safeParseJSON(value: string) {
+          try {
+            return JSON.parse(value);
+          } catch {
+            return value; // or return [] if that's safer
+          }
+        }
+
+        setAllPolls(pollsWithParsedOptions);
+        localStorage.setItem(
+          "allPolls",
+          JSON.stringify(pollsWithParsedOptions)
+        );
+      } catch (error) {
+        console.error("Error fetching polls:", error);
+      }
+    };
+
+    fetchAllPoll();
+  }, []);
+
   const authContextValue: AuthContextType = {
     ...state,
     login,
     logout,
-    setState,
     updateUser,
+    setAllPolls,
+    allPolls,
   };
 
   return (

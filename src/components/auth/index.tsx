@@ -18,13 +18,11 @@ const LoginForm = () => {
 
   return (
     <div>
-      index
       {showSignupPage ? (
         <SignUpComp setShowSignupPage={setShowSignupPage} />
       ) : (
         <LoginComp setShowSignupPage={setShowSignupPage} />
       )}
-      <Button onClick={() => setShowSignupPage(!showSignupPage)}>Click</Button>
     </div>
   );
 };

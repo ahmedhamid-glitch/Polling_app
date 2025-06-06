@@ -88,7 +88,7 @@ export default function SignUpComp({
       const data = await response.json();
       const { user, token } = data;
       console.log("Login successful:", user, token);
-      login(user, token);
+      login({ user, token });
       router.push("/");
       // Redirect or show success message here
     } catch (error) {
