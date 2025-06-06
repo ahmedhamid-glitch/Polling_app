@@ -189,11 +189,12 @@ export default function LivePollPage() {
 
     try {
       const res = await fetch(`/api/votes`, {
-        method: "DELETE",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userEmail: user.email,
           userName: user.userName,
+          vote: "undefined",
           pollId,
         }),
       });
