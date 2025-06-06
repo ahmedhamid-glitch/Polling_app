@@ -8,6 +8,7 @@ import {
   LinearProgress,
   Stack,
   Paper,
+  CircularProgress,
 } from "@mui/material";
 import { Users, Vote, BarChart3 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -31,9 +32,10 @@ interface PollIdData {
 
 export default function LivePollPage() {
   const searchParams = useSearchParams();
-  const pollId = searchParams.get("pollId");
+  const pollId = searchParams?.get("pollId");
   const [pollIdData, setPollIdData] = useState<PollIdData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const storedUser =
     typeof window !== "undefined" ? localStorage.getItem("user") : null;
@@ -51,10 +53,14 @@ export default function LivePollPage() {
   );
 
   // Use our SSE hook
-  const { isConnected, error } = useVoteStream(pollId || "");
+  const { isConnected, error: sseError } = useVoteStream(pollId || "");
 
   useEffect(() => {
-    if (!pollId) return;
+    if (!pollId) {
+      setError("Poll ID is required");
+      setLoading(false);
+      return;
+    }
 
     const fetchAllPoll = async () => {
       try {
@@ -62,6 +68,7 @@ export default function LivePollPage() {
         if (!res.ok) {
           const errorData = await res.json();
           console.error("Poll get failed:", errorData.message);
+          setError(errorData.message || "Failed to fetch poll data");
           return;
         }
 
@@ -70,6 +77,7 @@ export default function LivePollPage() {
 
         if (!rawPoll) {
           console.warn("Poll not found or empty.");
+          setError("Poll not found");
           return;
         }
 
@@ -81,8 +89,10 @@ export default function LivePollPage() {
 
         setPollIdData(parsedPoll);
         localStorage.setItem("pollIdData", JSON.stringify(parsedPoll));
+        setError(null);
       } catch (error) {
         console.error("Error fetching polls:", error);
+        setError("An error occurred while fetching poll data");
       } finally {
         setLoading(false);
       }
@@ -106,6 +116,40 @@ export default function LivePollPage() {
       );
     };
   }, [pollId]);
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          bgcolor: "green.50",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          bgcolor: "green.50",
+        }}
+      >
+        <Typography color="error" variant="h6">
+          {error}
+        </Typography>
+      </Box>
+    );
+  }
 
   const currentPoll = pollIdData;
   const title = currentPoll?.title ?? "Loading...";
@@ -217,127 +261,123 @@ export default function LivePollPage() {
         sx={{ p: 4, borderRadius: 2, boxShadow: 3 }}
       >
         <Typography variant="h5" fontWeight="bold" align="center" gutterBottom>
-          {loading ? "Loading poll..." : title}
+          {title}
         </Typography>
 
-        {!loading && (
-          <>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="center"
+          spacing={1}
+          mb={3}
+          color="text.secondary"
+        >
+          <Users size={20} />
+          <Typography variant="body2">{totalVotes} total votes</Typography>
+          {!isConnected && (
+            <Typography variant="caption" color="error">
+              (Reconnecting...)
+            </Typography>
+          )}
+        </Stack>
+
+        {options.map((opt, idx) => (
+          <Box key={idx} mb={3}>
             <Stack
               direction="row"
+              justifyContent="space-between"
               alignItems="center"
-              justifyContent="center"
-              spacing={1}
-              mb={3}
-              color="text.secondary"
+              mb={1}
             >
-              <Users size={20} />
-              <Typography variant="body2">{totalVotes} total votes</Typography>
-              {!isConnected && (
-                <Typography variant="caption" color="error">
-                  (Reconnecting...)
-                </Typography>
+              <Typography variant="body1" fontWeight="medium">
+                {opt}
+              </Typography>
+              {userVote?.vote === opt && userVote?.vote !== "undefined" ? (
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="small"
+                  onClick={() => pollId && removeVote(pollId)}
+                >
+                  Remove Vote
+                </Button>
+              ) : (
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={!!userVote && userVote?.vote !== "undefined"}
+                  onClick={() => pollId && registerVote(opt, pollId)}
+                >
+                  Vote
+                </Button>
               )}
             </Stack>
+            <LinearProgress
+              variant="determinate"
+              value={Number(getPercentage(votes[idx]))}
+              sx={{ height: 10, borderRadius: 5, bgcolor: "grey.300" }}
+            />
+            <Typography
+              variant="caption"
+              align="right"
+              display="block"
+              color="text.secondary"
+              mt={0.5}
+            >
+              {getPercentage(votes[idx])}%
+            </Typography>
+          </Box>
+        ))}
 
-            {options.map((opt, idx) => (
-              <Box key={idx} mb={3}>
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="center"
-                  mb={1}
-                >
-                  <Typography variant="body1" fontWeight="medium">
-                    {opt}
-                  </Typography>
-                  {userVote?.vote === opt && userVote?.vote !== "undefined" ? (
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      size="small"
-                      onClick={() => pollId && removeVote(pollId)}
-                    >
-                      Remove Vote
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="contained"
-                      size="small"
-                      disabled={!!userVote && userVote?.vote !== "undefined"}
-                      onClick={() => pollId && registerVote(opt, pollId)}
-                    >
-                      Vote
-                    </Button>
-                  )}
-                </Stack>
-                <LinearProgress
-                  variant="determinate"
-                  value={Number(getPercentage(votes[idx]))}
-                  sx={{ height: 10, borderRadius: 5, bgcolor: "grey.300" }}
-                />
-                <Typography
-                  variant="caption"
-                  align="right"
-                  display="block"
-                  color="text.secondary"
-                  mt={0.5}
-                >
-                  {getPercentage(votes[idx])}%
-                </Typography>
-              </Box>
-            ))}
+        {totalVotes === 0 && (
+          <Box textAlign="center" py={8} color="text.disabled">
+            <Vote size={40} style={{ margin: "0 auto 8px" }} />
+            <Typography>No votes yet. Be the first to vote!</Typography>
+          </Box>
+        )}
 
-            {totalVotes === 0 && (
-              <Box textAlign="center" py={8} color="text.disabled">
-                <Vote size={40} style={{ margin: "0 auto 8px" }} />
-                <Typography>No votes yet. Be the first to vote!</Typography>
-              </Box>
-            )}
+        {totalVotes > 0 && (
+          <Box borderTop={1} borderColor="divider" pt={4}>
+            <Typography
+              variant="h6"
+              fontWeight="semibold"
+              mb={3}
+              display="flex"
+              alignItems="center"
+              gap={1}
+            >
+              <BarChart3 size={20} />
+              Poll Statistics
+            </Typography>
 
-            {totalVotes > 0 && (
-              <Box borderTop={1} borderColor="divider" pt={4}>
-                <Typography
-                  variant="h6"
-                  fontWeight="semibold"
-                  mb={3}
-                  display="flex"
-                  alignItems="center"
-                  gap={1}
-                >
-                  <BarChart3 size={20} />
-                  Poll Statistics
-                </Typography>
-
-                <Stack
-                  direction="row"
-                  spacing={2}
-                  flexWrap="wrap"
-                  justifyContent="center"
-                >
-                  <StatCard
-                    label="Total Votes"
-                    value={totalVotes}
-                    color="primary"
-                  />
-                  <StatCard
-                    label="Options"
-                    value={options.length}
-                    color="success.main"
-                  />
-                  <StatCard
-                    label="Highest Votes"
-                    value={Math.max(...votes)}
-                    color="purple"
-                  />
-                  <StatCard
-                    label="Active Options"
-                    value={votes.filter((v) => v > 0).length}
-                    color="orange"
-                  />
-                </Stack>
-              </Box>
-            )}
-          </>
+            <Stack
+              direction="row"
+              spacing={2}
+              flexWrap="wrap"
+              justifyContent="center"
+            >
+              <StatCard
+                label="Total Votes"
+                value={totalVotes}
+                color="primary"
+              />
+              <StatCard
+                label="Options"
+                value={options.length}
+                color="success.main"
+              />
+              <StatCard
+                label="Highest Votes"
+                value={Math.max(...votes)}
+                color="purple"
+              />
+              <StatCard
+                label="Active Options"
+                value={votes.filter((v) => v > 0).length}
+                color="orange"
+              />
+            </Stack>
+          </Box>
         )}
 
         {showUserPopup && (
