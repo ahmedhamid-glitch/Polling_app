@@ -30,9 +30,13 @@ export async function POST(request: Request) {
       vote,
       pollId,
     });
-    (globalThis as any).__votesSSEClients?.forEach((send: any) => {
-      send({ type: "voteUpdate" });
+
+    // Broadcast update to all clients listening to this poll
+    const clients = (globalThis as any).__votesSSEClients?.[pollId] || [];
+    clients.forEach((send: any) => {
+      send({ type: "voteUpdate", pollId });
     });
+
     return NextResponse.json({ success: true, data: insertedPoll });
   } catch (error: any) {
     console.error("Error in POST /live_poll:", error);
@@ -43,40 +47,53 @@ export async function POST(request: Request) {
   }
 }
 
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json();
+    const { userEmail, userName, pollId } = body;
+
+    if (!userEmail || !userName || !pollId) {
+      throw new Error("Missing required fields");
+    }
+
+    const result = await deleteVotes({ userEmail, userName, pollId });
+
+    // Broadcast update to all clients listening to this poll
+    const clients = (globalThis as any).__votesSSEClients?.[pollId] || [];
+    clients.forEach((send: any) => {
+      send({ type: "voteUpdate", pollId });
+    });
+
+    return NextResponse.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error("Error in DELETE /votes:", error);
+    return NextResponse.json(
+      { error: error.message || "Server error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const {
-      userEmail,
-      userName,
-      vote,
-      pollId,
-    }: {
-      userEmail: string;
-      userName: string;
-      vote: string;
-      pollId: string;
-    } = body;
+    const { userEmail, vote, pollId } = body;
 
-    // Creating new poll requires title, options, userEmail
-    if (!userEmail || !userName || !vote || !pollId) {
-      throw new Error(
-        "Missing required fields: title, options, and userEmail are required."
-      );
+    if (!userEmail || !vote || !pollId) {
+      throw new Error("Missing required fields");
     }
 
-    // Creating new poll starts with empty votes array
-    const insertedPoll = await updateVotes({
-      userEmail,
-      vote,
-      pollId,
+    const result = await updateVotes({ userEmail, vote, pollId });
+
+    // Broadcast update to all clients listening to this poll
+    const clients = (globalThis as any).__votesSSEClients?.[pollId] || [];
+    clients.forEach((send: any) => {
+      send({ type: "voteUpdate", pollId });
     });
-    (globalThis as any).__votesSSEClients?.forEach((send: any) => {
-      send({ type: "voteUpdate" });
-    });
-    return NextResponse.json({ success: true, data: insertedPoll });
+
+    return NextResponse.json({ success: true, data: result });
   } catch (error: any) {
-    console.error("Error in POST /live_poll:", error);
+    console.error("Error in PUT /votes:", error);
     return NextResponse.json(
       { error: error.message || "Server error" },
       { status: 500 }

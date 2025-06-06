@@ -1,6 +1,13 @@
 // app/api/votes/stream/route.ts
 
 export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const pollId = url.searchParams.get("pollId");
+
+  if (!pollId) {
+    return new Response("Poll ID is required", { status: 400 });
+  }
+
   const stream = new ReadableStream({
     start(controller) {
       const send = (data: any) => {
@@ -15,16 +22,17 @@ export async function GET(req: Request) {
         send({ message: "ping" });
       }, 10000);
 
-      // Store controller + send function somewhere if you want to trigger manual send later
-      (globalThis as any).__votesSSEClients ||= [];
-      (globalThis as any).__votesSSEClients.push(send);
+      // Store controller + send function by pollId
+      (globalThis as any).__votesSSEClients ||= {};
+      (globalThis as any).__votesSSEClients[pollId] ||= [];
+      (globalThis as any).__votesSSEClients[pollId].push(send);
 
       // Cleanup
       req.signal.addEventListener("abort", () => {
         clearInterval(keepAliveId);
-        (globalThis as any).__votesSSEClients = (
+        (globalThis as any).__votesSSEClients[pollId] = (
           globalThis as any
-        ).__votesSSEClients?.filter((fn: any) => fn !== send);
+        ).__votesSSEClients[pollId]?.filter((fn: any) => fn !== send);
       });
     },
   });

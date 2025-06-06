@@ -13,6 +13,7 @@ import { Users, Vote, BarChart3 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import UserInfoPopup from "../userInfoPopup";
 import StatCard from "../statCard";
+import { useVoteStream } from "@/hooks/useVoteStream";
 
 interface Votes {
   vote: string;
@@ -48,6 +49,9 @@ export default function LivePollPage() {
   const [pendingVoteOption, setPendingVoteOption] = useState<string | null>(
     null
   );
+
+  // Use our SSE hook
+  const { isConnected, error } = useVoteStream(pollId || "");
 
   useEffect(() => {
     if (!pollId) return;
@@ -85,33 +89,21 @@ export default function LivePollPage() {
     };
 
     fetchAllPoll();
-  }, [pollId]);
 
-  useEffect(() => {
-    if (!pollId) return;
-
-    const eventSource = new EventSource(`/api/votes/stream`);
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log("SSE data received:", data);
-
-        if (data.type === "voteUpdate") {
-          refreshPoll();
-        }
-      } catch (err) {
-        console.error("Error parsing SSE event:", err);
+    // Listen for vote updates
+    const handleVoteUpdate = (event: CustomEvent) => {
+      if (event.detail.pollId === pollId) {
+        fetchAllPoll();
       }
     };
 
-    eventSource.onerror = (err) => {
-      console.error("SSE error:", err);
-      eventSource.close();
-    };
+    window.addEventListener("voteUpdate", handleVoteUpdate as EventListener);
 
     return () => {
-      eventSource.close();
+      window.removeEventListener(
+        "voteUpdate",
+        handleVoteUpdate as EventListener
+      );
     };
   }, [pollId]);
 
@@ -129,22 +121,6 @@ export default function LivePollPage() {
 
   const getPercentage = (count: number) =>
     totalVotes ? ((count / totalVotes) * 100).toFixed(1) : "0.0";
-
-  const refreshPoll = async () => {
-    if (!pollId) return;
-    const res = await fetch(`/api/votes?pollId=${pollId}`);
-    const result = await res.json();
-    const rawPoll = result.data;
-
-    const parsedPoll = {
-      ...rawPoll,
-      options: rawPoll.options,
-      votes: rawPoll.votes,
-    };
-
-    setPollIdData(parsedPoll);
-    localStorage.setItem("pollIdData", JSON.stringify(parsedPoll));
-  };
 
   const saveUserInfo = async () => {
     if (!inputEmail || !inputUserName) {
@@ -172,9 +148,6 @@ export default function LivePollPage() {
         if (!res.ok) {
           const errorData = await res.json();
           console.error("Vote failed:", errorData.message);
-        } else {
-          await refreshPoll();
-          setPendingVoteOption(null);
         }
       } catch (error) {
         console.error("Error casting vote:", error);
@@ -206,8 +179,6 @@ export default function LivePollPage() {
         console.error("Vote failed:", errorData.message);
         return;
       }
-
-      await refreshPoll();
     } catch (error) {
       console.error("Error casting vote:", error);
     }
@@ -218,12 +189,11 @@ export default function LivePollPage() {
 
     try {
       const res = await fetch(`/api/votes`, {
-        method: "PUT",
+        method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userEmail: user.email,
           userName: user.userName,
-          vote: "undefined",
           pollId,
         }),
       });
@@ -233,8 +203,6 @@ export default function LivePollPage() {
         console.error("Vote removal failed:", errorData.message);
         return;
       }
-
-      await refreshPoll();
     } catch (error) {
       console.error("Error removing vote:", error);
     }
@@ -263,6 +231,11 @@ export default function LivePollPage() {
             >
               <Users size={20} />
               <Typography variant="body2">{totalVotes} total votes</Typography>
+              {!isConnected && (
+                <Typography variant="caption" color="error">
+                  (Reconnecting...)
+                </Typography>
+              )}
             </Stack>
 
             {options.map((opt, idx) => (
