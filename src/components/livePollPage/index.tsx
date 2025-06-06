@@ -1,4 +1,4 @@
-"use client";
+'use client'; // 👈 ye zaroor lagao
 import React, { useState, useEffect } from "react";
 import {
   Box,
