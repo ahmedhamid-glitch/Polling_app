@@ -40,7 +40,6 @@ export default function LivePollPage() {
   const storedUser =
     typeof window !== "undefined" ? localStorage.getItem("user") : null;
   const initialUser = storedUser ? JSON.parse(storedUser) : null;
-  console.log("🚀 ~ LivePollPage ~ initialUser:", initialUser);
   const [user, setUser] = useState<{ email: string; userName: string } | null>(
     initialUser
   );
@@ -208,7 +207,6 @@ export default function LivePollPage() {
   };
 
   const registerVote = async (opt: string, pollId: string) => {
-    console.log("users:", user);
     if (!user) {
       setPendingVoteOption(opt);
       setShowUserPopup(true);

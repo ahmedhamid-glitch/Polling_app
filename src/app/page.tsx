@@ -9,7 +9,6 @@ import { AuthContext } from "@/contexts/AuthContext";
 
 export default function page() {
   const { allPolls, setAllPolls }: any = useContext(AuthContext);
-  console.log("🚀 ~ page ~ allPolls:", allPolls)
   const [title, setTitle] = useState("");
   const [options, setOptions] = useState<string[]>(["", ""]);
   const [loading, setLoading] = useState(false);
@@ -86,7 +85,6 @@ export default function page() {
       }
 
       const newPoll = await res.json();
-      console.log("res:", newPoll.data.pollIdVoteData);
       setAllPolls((prev: any) => [...prev, newPoll.data]);
 
       // Additional vote API call

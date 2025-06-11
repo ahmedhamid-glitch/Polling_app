@@ -64,14 +64,9 @@ export default function LoginForm({
       }
 
       const { user, token } = await res.json();
-      console.log("Login successful:2", user, token);
 
       login({ user, token });
-      // const res = await fetch("/api/auth", {
-      //   method: "POST",
-      //   headers: { "Content-Type": "application/json" },
-      //   body: JSON.stringify({ email, password, action: "login" }),
-      // });
+
       router.push("/");
     } catch (err) {
       console.error("Login error:", err);

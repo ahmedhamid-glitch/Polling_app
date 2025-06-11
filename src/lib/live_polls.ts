@@ -50,20 +50,15 @@ export async function createLivePollQes({
 
 // Fetch all polls for a given user
 export async function getAllPolls(email: string) {
-  console.log("Attempting to connect to database...");
   const db = await getDb();
   if (!db) {
     console.error("Database connection failed - getDb() returned null");
     throw new Error("Database connection failed");
   }
-  console.log("Database connection successful");
 
-  console.log("Ensuring live_poll table exists...");
   await ensureLivePollTableExists();
-  console.log("Table check complete");
 
   try {
-    console.log("Fetching polls for email:", email);
     const [result] = await db.query(
       "SELECT * FROM live_poll WHERE userEmail = ?",
       [email]
@@ -75,7 +70,6 @@ export async function getAllPolls(email: string) {
       options: JSON.parse(poll.options),
     }));
 
-    console.log("Query result:", parsedPolls);
     return { allPolls: parsedPolls };
   } catch (error: any) {
     console.error("Error in getAllPolls:", error);

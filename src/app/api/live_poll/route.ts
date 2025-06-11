@@ -52,9 +52,7 @@ export async function GET(request: Request) {
       );
     }
 
-    console.log("Fetching polls for email:", email);
     const data = await getAllPolls(email);
-    console.log("Polls data:", data);
 
     if (!data || !data.allPolls) {
       return NextResponse.json(

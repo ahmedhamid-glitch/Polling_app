@@ -52,7 +52,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const login = ({ token, ...user }: { token: string } & User) => {
-    console.log("users:", user.user, token);
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(user.user));
 
@@ -82,12 +81,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
-  const checkToken = () => {
+  const checkToken = async () => {
     const token = localStorage.getItem("token");
     const user = localStorage.getItem("user");
 
     if (token && user) {
       try {
+        const parsedUser = JSON.parse(user);
+
+        // Step 1: Check if user exists in DB via /api/auth
+        const response = await fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: parsedUser.email,
+            action: "checkUserByEmail",
+          }),
+        });
+
+        if (!response.ok) {
+          console.warn("User not found in database. Logging out.");
+          logout();
+          return;
+        }
+ 
         const decoded: any = jwtDecode(token); // <-- use jwtDecode directly here
         const isExpired = decoded.exp * 1000 < Date.now();
 
@@ -144,7 +161,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const data = await res.json();
 
         if (!data.data?.allPolls?.length) {
-          console.log("Poll table not ready or no polls found.");
           return;
         }
 

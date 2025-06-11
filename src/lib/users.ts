@@ -66,18 +66,12 @@ export async function login(email: string, password: string) {
   return safeUser;
 }
 
-export async function deleteUser(id: number): Promise<boolean> {
+export async function checkUserByEmail(email: string): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
 
-  const [result] = await db.query("DELETE FROM users WHERE id = ?", [id]);
-  return (result as any).affectedRows > 0;
-}
-
-export async function getAllUsers(): Promise<User[]> {
-  const db = await getDb();
-  if (!db) return [];
-
-  const [rows] = await db.query("SELECT * FROM users");
-  return rows as User[];
+  const [rows] = await db.query("SELECT id FROM users WHERE email = ?", [
+    email,
+  ]);
+  return (rows as any[]).length > 0;
 }

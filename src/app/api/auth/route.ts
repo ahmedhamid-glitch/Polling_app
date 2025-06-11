@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { signUp, login } from "@/lib/users";
+import { signUp, login, checkUserByEmail } from "@/lib/users";
 import jwt from "jsonwebtoken";
 const JWT_SECRET = process.env.JWT_SECRET!;
 
@@ -14,14 +14,30 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action, userName, recoverEmail, email, password } = body;
 
-    if (!email || !password) {
+    if (!email) {
       return NextResponse.json(
-        { error: "Email and password are required" },
+        { error: "Email are required" },
         { status: 400 }
       );
     }
 
     let user;
+    if (action === "checkUserByEmail") {
+      user = await checkUserByEmail(email);
+      if (!user) {
+        return NextResponse.json(
+          { error: "Invalid credentials" },
+          { status: 401 }
+        );
+      }
+    }
+
+    if (!password) {
+      return NextResponse.json(
+        { error: "Password are required" },
+        { status: 400 }
+      );
+    }
 
     if (action === "signup") {
       if (!userName || !recoverEmail) {
