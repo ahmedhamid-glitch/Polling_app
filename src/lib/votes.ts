@@ -9,7 +9,7 @@ async function ensureVoteTableExists() {
       id INT AUTO_INCREMENT PRIMARY KEY,
       pollId INT,
       userName VARCHAR(255) NOT NULL,
-      userEmail VARCHAR(255) NOT NULL,
+      userEmail VARCHAR(255) NOT NULL ,
       vote VARCHAR(255),
       FOREIGN KEY (pollId) REFERENCES live_poll(id)
         ON DELETE CASCADE
@@ -36,42 +36,30 @@ export async function createVotes({
 
   await ensureVoteTableExists();
 
-  const [votes] = await db.query(
-    "INSERT INTO votes (userEmail, userName, vote, pollId) VALUES (?, ?, ?, ?)",
-    [userEmail, userName, vote, pollId]
-  );
-  const insertId = (votes as any).insertId;
-  if (!insertId) return null;
-
-  return { id: insertId, userEmail, userName, vote, pollId };
-}
-
-export async function updateVotes({
-  userEmail,
-  vote,
-  pollId,
-}: {
-  userEmail: string;
-  vote: string;
-  pollId: string;
-}) {
-  const db = await getDb();
-  if (!db) return null;
-
-  await ensureVoteTableExists();
-
-  const [result] = await db.query(
-    "UPDATE votes SET vote = ? WHERE userEmail = ? AND pollId = ?",
-    [vote, userEmail, pollId]
+  // Check if a vote already exists for this userEmail and pollId
+  const [existing] = await db.query(
+    "SELECT id FROM votes WHERE userEmail = ? AND pollId = ?",
+    [userEmail, pollId]
   );
 
-  // Check if any row was affected (updated)
-  const affectedRows = (result as any).affectedRows;
-  if (affectedRows === 0) {
-    return null; // no update done, maybe vote doesn't exist yet
+  if ((existing as any[]).length > 0) {
+    // Vote exists → update it
+    const [result] = await db.query(
+      "UPDATE votes SET vote = ?, userName = ? WHERE userEmail = ? AND pollId = ?",
+      [vote, userName, userEmail, pollId]
+    );
+    return { updated: true, userEmail, userName, vote, pollId };
+  } else {
+    // Vote does not exist → insert new
+    const [votes] = await db.query(
+      "INSERT INTO votes (userEmail, userName, vote, pollId) VALUES (?, ?, ?, ?)",
+      [userEmail, userName, vote, pollId]
+    );
+    const insertId = (votes as any).insertId;
+    if (!insertId) return null;
+
+    return { id: insertId, userEmail, userName, vote, pollId };
   }
-
-  return { userEmail, vote, pollId };
 }
 
 export async function getVotes({ pollId }: { pollId: string }) {
@@ -95,30 +83,4 @@ export async function getVotes({ pollId }: { pollId: string }) {
     ...poll,
     votes,
   };
-}
-
-export async function deleteVotes({
-  userEmail,
-  userName,
-  pollId,
-}: {
-  userEmail: string;
-  userName: string;
-  pollId: string;
-}) {
-  const db = await getDb();
-  if (!db) return null;
-
-  await ensureVoteTableExists();
-
-  const [result] = await db.query(
-    "DELETE FROM votes WHERE userEmail = ? AND userName = ? AND pollId = ?",
-    [userEmail, userName, pollId]
-  );
-
-  const affectedRows = (result as any).affectedRows;
-
-  if (affectedRows === 0) return null; // no rows deleted
-
-  return { userEmail, userName, pollId };
 }

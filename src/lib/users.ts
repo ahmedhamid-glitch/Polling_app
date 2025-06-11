@@ -47,18 +47,6 @@ export async function signUp(
   return { id: insertId, email, password, userName, recoverEmail };
 }
 
-export async function getUserById(id: number): Promise<User | null> {
-  const db = await getDb();
-  if (!db) return null;
-
-  await ensureUsersTableExists();
-
-  const [rows] = await db.query("SELECT * FROM users WHERE id = ?", [id]);
-  const users = rows as User[];
-  if (users.length === 0) return null;
-  return users[0];
-}
-
 export async function login(email: string, password: string) {
   const db = await getDb();
   if (!db) return null;

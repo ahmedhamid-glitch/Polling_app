@@ -1,4 +1,4 @@
-'use client'; // 👈 ye zaroor lagao
+"use client";
 import React, { useState, useEffect } from "react";
 import {
   Box,
@@ -25,7 +25,7 @@ interface Votes {
 interface PollIdData {
   id: string;
   title: string;
-  options: string[];
+  options: string[] | string;
   userEmail: string;
   votes: Votes[];
 }
@@ -40,11 +40,11 @@ export default function LivePollPage() {
   const storedUser =
     typeof window !== "undefined" ? localStorage.getItem("user") : null;
   const initialUser = storedUser ? JSON.parse(storedUser) : null;
+  console.log("🚀 ~ LivePollPage ~ initialUser:", initialUser);
   const [user, setUser] = useState<{ email: string; userName: string } | null>(
     initialUser
   );
 
-  // Popup states
   const [showUserPopup, setShowUserPopup] = useState(false);
   const [inputEmail, setInputEmail] = useState("");
   const [inputUserName, setInputUserName] = useState("");
@@ -52,7 +52,6 @@ export default function LivePollPage() {
     null
   );
 
-  // Use our SSE hook
   const { isConnected, error: sseError } = useVoteStream(pollId || "");
 
   useEffect(() => {
@@ -81,7 +80,7 @@ export default function LivePollPage() {
           return;
         }
 
-        const parsedPoll = {
+        const parsedPoll: PollIdData = {
           ...rawPoll,
           options: rawPoll.options,
           votes: rawPoll.votes,
@@ -100,7 +99,6 @@ export default function LivePollPage() {
 
     fetchAllPoll();
 
-    // Listen for vote updates
     const handleVoteUpdate = (event: CustomEvent) => {
       if (event.detail.pollId === pollId) {
         fetchAllPoll();
@@ -115,7 +113,7 @@ export default function LivePollPage() {
         handleVoteUpdate as EventListener
       );
     };
-  }, [pollId]);
+  }, [pollId, user]);
 
   if (loading) {
     return (
@@ -153,12 +151,22 @@ export default function LivePollPage() {
 
   const currentPoll = pollIdData;
   const title = currentPoll?.title ?? "Loading...";
-  const options = currentPoll?.options ?? [];
+  const rawOptions = currentPoll?.options ?? [];
   const voteData = currentPoll?.votes ?? [];
 
-  const userVote = voteData.find((v) => v.userEmail === user?.email);
+  let parsedOptions: string[] = [];
+  try {
+    parsedOptions = Array.isArray(rawOptions)
+      ? rawOptions
+      : JSON.parse(rawOptions || "[]");
+  } catch (e) {
+    console.error("Failed to parse options:", rawOptions);
+    parsedOptions = [];
+  }
 
-  const votes = options.map(
+  const userVote = voteData.find((v: Votes) => v.userEmail === user?.email);
+
+  const votes = parsedOptions.map(
     (opt) => voteData.filter((v: Votes) => v.vote === opt).length
   );
   const totalVotes = votes.reduce((sum, v) => sum + v, 0);
@@ -200,6 +208,7 @@ export default function LivePollPage() {
   };
 
   const registerVote = async (opt: string, pollId: string) => {
+    console.log("users:", user);
     if (!user) {
       setPendingVoteOption(opt);
       setShowUserPopup(true);
@@ -208,7 +217,7 @@ export default function LivePollPage() {
 
     try {
       const res = await fetch(`/api/votes`, {
-        method: "PUT",
+        method: "POST", // put
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userEmail: user.email,
@@ -233,7 +242,7 @@ export default function LivePollPage() {
 
     try {
       const res = await fetch(`/api/votes`, {
-        method: "PUT",
+        method: "POST", //put
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userEmail: user.email,
@@ -281,7 +290,7 @@ export default function LivePollPage() {
           )}
         </Stack>
 
-        {options.map((opt, idx) => (
+        {parsedOptions.map((opt, idx) => (
           <Box key={idx} mb={3}>
             <Stack
               direction="row"
@@ -363,7 +372,7 @@ export default function LivePollPage() {
               />
               <StatCard
                 label="Options"
-                value={options.length}
+                value={parsedOptions.length}
                 color="success.main"
               />
               <StatCard
@@ -373,7 +382,7 @@ export default function LivePollPage() {
               />
               <StatCard
                 label="Active Options"
-                value={votes.filter((v) => v > 0).length}
+                value={votes.filter((v: any) => v > 0).length}
                 color="orange"
               />
             </Stack>
