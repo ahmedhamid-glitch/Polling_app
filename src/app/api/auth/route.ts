@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       user = await signUp(userName, recoverEmail, email, password);
       if (!user) {
         return NextResponse.json(
-          { error: "Failed to create user" },
+          { error: "Failed to create user", user },
           { status: 500 }
         );
       }
