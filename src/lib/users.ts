@@ -25,14 +25,19 @@ async function ensureUsersTableExists() {
   await db.query(createTableQuery);
 }
 
+type SignUpResult =
+  | { success: true; user: User }
+  | { success: false; error: string };
+
+// 2. Update your function signature:
 export async function signUp(
   userName: string,
   recoverEmail: string,
   email: string,
   password: string
-): Promise<User | null> {
+): Promise<SignUpResult> {
   const db = await getDb();
-  if (!db) return null;
+  if (!db) return { success: false, error: "DB connection failed" };
 
   await ensureUsersTableExists();
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -42,9 +47,18 @@ export async function signUp(
   );
 
   const insertId = (result as any).insertId;
-  if (!insertId) return null;
+  if (!insertId) return { success: false, error: "Insert failed" };
 
-  return { id: insertId, email, password, userName, recoverEmail };
+  return {
+    success: true,
+    user: {
+      id: insertId,
+      email,
+      password,
+      userName,
+      recoverEmail,
+    },
+  };
 }
 
 export async function getUserById(id: number): Promise<User | null> {
