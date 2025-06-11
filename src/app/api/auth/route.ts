@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { signUp, login } from "@/lib/users";
 import jwt from "jsonwebtoken";
-
 const JWT_SECRET = process.env.JWT_SECRET!;
+
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is not set");
+}
 
 export const dynamic = "force-dynamic";
 
