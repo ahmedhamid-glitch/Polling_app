@@ -132,7 +132,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!res.ok) {
           const errorData = await res.json();
-          console.error("Poll get failed:", errorData.message);
+          console.error("Poll get failed:", {
+            status: res.status,
+            statusText: res.statusText,
+            error: errorData.error,
+            details: errorData.details,
+          });
           return;
         }
 
@@ -146,14 +151,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const pollsWithParsedOptions = data.data.allPolls.map((poll: any) => ({
           ...poll,
           options: safeParseJSON(poll.options),
-          // votes: safeParseJSON(poll.votes),
         }));
 
         function safeParseJSON(value: string) {
           try {
             return JSON.parse(value);
           } catch {
-            return value; // or return [] if that's safer
+            return value;
           }
         }
 

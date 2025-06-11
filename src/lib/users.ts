@@ -11,7 +11,7 @@ export interface User {
 
 async function ensureUsersTableExists() {
   const db = await getDb();
-  if (!db) return;
+  if (!db) return db;
 
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS users (
