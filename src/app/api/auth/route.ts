@@ -1,40 +1,59 @@
 import { NextResponse } from "next/server";
 import { signUp, login, checkUserByEmail } from "@/lib/users";
 import jwt from "jsonwebtoken";
-const JWT_SECRET = process.env.JWT_SECRET!;
 
-if (!JWT_SECRET) {
-  throw new Error("JWT_SECRET environment variable is not set");
-}
+const JWT_SECRET = process.env.JWT_SECRET!;
+if (!JWT_SECRET) throw new Error("JWT_SECRET is not set");
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { action, userName, recoverEmail, email, password } = body;
+    const { action, userName, recoverEmail, email, password, verifyToken } =
+      body;
 
     if (!email) {
-      return NextResponse.json(
-        { error: "Email are required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
     let user;
+
     if (action === "checkUserByEmail") {
       user = await checkUserByEmail(email);
+
       if (!user) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
+
+      if (!verifyToken) {
+        return NextResponse.json({ error: "Token required" }, { status: 401 });
+      }
+
+      try {
+        const decoded: any = jwt.verify(verifyToken, JWT_SECRET);
+        if (decoded.email !== email) {
+          return NextResponse.json(
+            { error: "Token email mismatch" },
+            { status: 403 }
+          );
+        }
+
+        // Valid token and email matches
+        const { password: _, ...safeUser } = user as any;
+        return NextResponse.json({ valid: true, user: safeUser });
+      } catch (err) {
         return NextResponse.json(
-          { error: "Invalid credentials" },
+          { error: "Invalid or expired token" },
           { status: 401 }
         );
       }
     }
 
+    // Validate password for login/signup
     if (!password) {
       return NextResponse.json(
-        { error: "Password are required" },
+        { error: "Password is required" },
         { status: 400 }
       );
     }
@@ -50,7 +69,7 @@ export async function POST(request: Request) {
       user = await signUp(userName, recoverEmail, email, password);
       if (!user) {
         return NextResponse.json(
-          { error: "Failed to create user", user },
+          { error: "Failed to create user" },
           { status: 500 }
         );
       }
@@ -66,10 +85,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
 
-    // Exclude password and sensitive fields
     const { password: _, ...safeUser } = user;
 
-    // Generate JWT Token
     const token = jwt.sign(
       { id: safeUser.id, email: safeUser.email, userName: safeUser.userName },
       JWT_SECRET,

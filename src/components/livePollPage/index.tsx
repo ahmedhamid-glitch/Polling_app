@@ -259,6 +259,16 @@ export default function LivePollPage() {
       console.error("Error removing vote:", error);
     }
   };
+  const isVotingUser = !!user;
+
+  const handleVotingLogin = () => {
+    setShowUserPopup(true);
+  };
+
+  const handleVotingLogout = () => {
+    localStorage.removeItem("user");
+    setUser(null);
+  };
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "green.50", p: 4 }}>
@@ -267,7 +277,31 @@ export default function LivePollPage() {
         component={Paper}
         sx={{ p: 4, borderRadius: 2, boxShadow: 3 }}
       >
-        <Typography variant="h5" fontWeight="bold" align="center" gutterBottom>
+        <Box sx={{ position: "relative" }}>
+          <Button
+            sx={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              textTransform: "none", // to keep text exactly as written
+            }}
+            variant="contained"
+            color={isVotingUser ? "error" : "primary"}
+            onClick={isVotingUser ? handleVotingLogout : handleVotingLogin}
+          >
+            {isVotingUser ? "Logout from Voting" : "Login to Vote"}
+          </Button>
+        </Box>
+
+        <Typography
+          variant="h5"
+          fontWeight="bold"
+          align="center"
+          gutterBottom
+          sx={{
+            marginTop: "60px",
+          }}
+        >
           {title}
         </Typography>
 

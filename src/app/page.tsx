@@ -76,16 +76,16 @@ export default function page() {
         }),
       });
 
+      const responseData = await res.json();
+
       if (!res.ok) {
-        const errorData = await res.json();
-        console.error("Poll creation failed:", errorData.message);
-        alert("Poll creation failed: " + errorData.message);
+        console.error("Poll creation failed:", responseData.message);
+        alert("Poll creation failed: " + responseData.message);
         setLoading(false);
         return;
       }
-
-      const newPoll = await res.json();
-      setAllPolls((prev: any) => [...prev, newPoll.data]);
+      // const newPoll = await res.json();
+      setAllPolls((prev: any) => [...prev, responseData.data]);
 
       // Additional vote API call
       try {
@@ -96,7 +96,7 @@ export default function page() {
             userEmail: user.email,
             userName: user.userName,
             vote: "undefined",
-            pollId: newPoll.data.pollIdVoteData,
+            pollId: responseData.data.pollIdVoteData,
           }),
         });
 

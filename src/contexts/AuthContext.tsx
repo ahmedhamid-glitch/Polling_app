@@ -7,8 +7,7 @@ import React, {
   Dispatch,
   SetStateAction,
 } from "react";
-
-import { jwtDecode } from "jwt-decode"; // <-- fixed import here
+import { jwtDecode } from "jwt-decode";
 
 // Types
 interface User {
@@ -40,6 +39,15 @@ interface AuthContextType extends AuthState {
 
 // Context
 export const AuthContext = createContext<AuthContextType | null>(null);
+
+// Utility
+const safeParse = <T = any,>(value: string): T | null => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
 
 // Provider
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -83,53 +91,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const checkToken = async () => {
     const token = localStorage.getItem("token");
-    const user = localStorage.getItem("user");
+    const userString = localStorage.getItem("user");
 
-    if (token && user) {
-      try {
-        const parsedUser = JSON.parse(user);
-
-        // Step 1: Check if user exists in DB via /api/auth
-        const response = await fetch("/api/auth", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: parsedUser.email,
-            action: "checkUserByEmail",
-          }),
-        });
-
-        if (!response.ok) {
-          console.warn("User not found in database. Logging out.");
-          logout();
-          return;
-        }
- 
-        const decoded: any = jwtDecode(token); // <-- use jwtDecode directly here
-        const isExpired = decoded.exp * 1000 < Date.now();
-
-        if (isExpired) {
-          logout();
-          return;
-        }
-
-        setState((prev) => ({
-          ...prev,
-          isAuthenticated: true,
-          user: JSON.parse(user),
-          isInitialized: true,
-        }));
-      } catch (err) {
-        console.error("Token decode error:", err);
-        logout();
-      }
-    } else {
+    if (!token || !userString) {
       setState((prev) => ({
         ...prev,
         isAuthenticated: false,
         user: null,
         isInitialized: true,
       }));
+      return;
+    }
+
+    const parsedUser = safeParse<User>(userString);
+    if (!parsedUser) {
+      logout();
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: parsedUser.email,
+          action: "checkUserByEmail",
+          verifyToken: token,
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn("User not found in database. Logging out.");
+        logout();
+        window.location.reload();
+        return;
+      }
+
+      const decoded: any = jwtDecode(token);
+      const isExpired = decoded.exp * 1000 < Date.now();
+
+      if (isExpired) {
+        logout();
+        return;
+      }
+
+      setState((prev) => ({
+        ...prev,
+        isAuthenticated: true,
+        user: parsedUser,
+        isInitialized: true,
+      }));
+    } catch (err) {
+      console.error("Token decode error:", err);
+      logout();
     }
   };
 
@@ -138,11 +152,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
+    if (!state.isAuthenticated) return;
+
     const fetchAllPoll = async () => {
       const storedUser = localStorage.getItem("user");
-      if (!storedUser) return;
-
-      const user = JSON.parse(storedUser);
+      const user = safeParse<User>(storedUser || "");
+      if (!user) return;
 
       try {
         const res = await fetch(`/api/live_poll?email=${user.email}`);
@@ -160,22 +175,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const data = await res.json();
 
-        if (!data.data?.allPolls?.length) {
-          return;
-        }
+        if (!data.data?.allPolls?.length) return;
 
         const pollsWithParsedOptions = data.data.allPolls.map((poll: any) => ({
           ...poll,
-          options: safeParseJSON(poll.options),
+          options: safeParse(poll.options) || poll.options,
         }));
-
-        function safeParseJSON(value: string) {
-          try {
-            return JSON.parse(value);
-          } catch {
-            return value;
-          }
-        }
 
         setAllPolls(pollsWithParsedOptions);
         localStorage.setItem(
@@ -188,7 +193,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     fetchAllPoll();
-  }, []);
+  }, [state.isAuthenticated]);
 
   const authContextValue: AuthContextType = {
     ...state,

@@ -1,7 +1,7 @@
 "use client";
 
 import { AuthContext } from "@/contexts/AuthContext";
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 import {
   Container,
   Typography,
@@ -10,16 +10,53 @@ import {
   ListItemText,
   Box,
   ListItem,
+  IconButton,
 } from "@mui/material";
 import { useRouter } from "next/navigation";
 import AuthGate from "@/components/AuthGate";
+import { DeleteOutline } from "@mui/icons-material";
 
 const Page = () => {
   const router = useRouter();
-  const { allPolls }: any = useContext(AuthContext);
+  const { allPolls, setAllPolls }: any = useContext(AuthContext);
+  const [loading, setLoading] = useState(false);
 
   const handleLivePoll = (pollId: number) => {
     router.push(`/live_poll?pollId=${pollId}`);
+  };
+
+  const handleDeletePoll = async (pollId: number) => {
+    try {
+      const res = await fetch("/api/live_poll", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pollId }),
+      });
+
+      const responseData = await res.json();
+
+      if (!res.ok) {
+        console.error("Poll deletion failed:", responseData.message);
+        alert("Poll deletion failed: " + responseData.message);
+        setLoading(false);
+        return;
+      }
+
+      // Remove the deleted poll from state
+      setAllPolls((prev: any) => {
+        const updatedPolls = prev.filter((poll: any) => poll.id !== pollId);
+
+        // Save to localStorage
+        localStorage.setItem("allPolls", JSON.stringify(updatedPolls));
+
+        return updatedPolls;
+      });
+    } catch (error) {
+      console.error("Poll deletion error:", error);
+      alert("An unexpected error occurred. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -55,6 +92,7 @@ const Page = () => {
                 onClick={() => handleLivePoll(poll.id)}
                 elevation={3}
                 sx={{
+                  position: "relative",
                   cursor: "pointer",
                   borderRadius: "10px !important",
                   p: 3,
@@ -64,6 +102,23 @@ const Page = () => {
                   },
                 }}
               >
+                {/* Delete Icon */}
+                <IconButton
+                  aria-label="delete"
+                  onClick={(e) => {
+                    e.stopPropagation(); // prevent card click
+                    handleDeletePoll(poll.id); // your delete function
+                  }}
+                  sx={{
+                    position: "absolute",
+                    top: 8,
+                    right: 8,
+                    zIndex: 1,
+                  }}
+                >
+                  <DeleteOutline />
+                </IconButton>
+                {/* Title */}
                 <Typography
                   variant="h5"
                   component="h2"
@@ -72,6 +127,7 @@ const Page = () => {
                 >
                   {poll.title}
                 </Typography>
+
                 <List>
                   {poll?.options?.map((option: string, index: number) => (
                     <ListItem

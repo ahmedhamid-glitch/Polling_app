@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 
-// Ensure live_poll table exists with TEXT instead of JSON for compatibility
+// Ensure live_poll table exists
 async function ensureLivePollTableExists() {
   const db = await getDb();
   if (!db) throw new Error("Database connection failed");
@@ -8,7 +8,7 @@ async function ensureLivePollTableExists() {
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS live_poll (
       id INT AUTO_INCREMENT PRIMARY KEY,
-      title VARCHAR(255) NOT NULL UNIQUE,
+      title VARCHAR(255) NOT NULL,
       options TEXT NOT NULL,
       userEmail VARCHAR(255) NOT NULL,
       FOREIGN KEY (userEmail) REFERENCES users(email)
@@ -37,15 +37,48 @@ export async function createLivePollQes({
 
   const optionsStr = JSON.stringify(options);
 
-  const [result] = await db.query(
-    "INSERT INTO live_poll (title, options, userEmail) VALUES (?, ?, ?)",
-    [title, optionsStr, userEmail]
-  );
+  try {
+    const [result] = await db.query(
+      "INSERT INTO live_poll (title, options, userEmail) VALUES (?, ?, ?)",
+      [title, optionsStr, userEmail]
+    );
 
-  const insertId = (result as any).insertId;
-  if (!insertId) return null;
+    const insertId = (result as any).insertId;
+    if (!insertId) return null;
 
-  return { pollIdVoteData: insertId };
+    return { pollIdVoteData: insertId };
+  } catch (error: any) {
+    console.error("Error in createLivePollQes:", error);
+    throw new Error(`Failed to create poll: ${error.message}`);
+  }
+}
+
+export async function delLivePollQes({ pollId }: { pollId: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection failed");
+
+  await ensureLivePollTableExists();
+
+  try {
+    // First delete from votes table (if it exists and has foreign key)
+    await db.query("DELETE FROM votes WHERE pollId = ?", [pollId]);
+
+    // Then delete from live_poll table
+    const [result] = await db.query("DELETE FROM live_poll WHERE id = ?", [
+      pollId,
+    ]);
+
+    // Check how many rows were affected
+    const affectedRows = (result as any).affectedRows;
+    if (affectedRows === 0) {
+      throw new Error("Poll not found or already deleted.");
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in delLivePollQes:", error);
+    throw new Error(`Failed to delete poll: ${error.message}`);
+  }
 }
 
 // Fetch all polls for a given user
